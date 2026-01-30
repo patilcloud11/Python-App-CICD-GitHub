@@ -1,4 +1,3 @@
-
 name: Install Python & Deploy App using SSH_KEY
 
 on:
