@@ -1,4 +1,4 @@
-name: Install Python & Deploy App using SSH_KEY
+name: Install Python & Deploy App using SSH
 
 on:
   push:
@@ -10,23 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository (for GitHub context only)
+      # 1️⃣ Checkout repo (needed for GitHub context)
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup SSH using private key stored in secrets
+      # 2️⃣ Setup SSH
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # 3️⃣ SSH into EC2 and deploy application
-      - name: Install Python, Deploy App
+      # 3️⃣ Deploy on EC2
+      - name: Install Python & Deploy App
         run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_ed25519 \
+          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
+
+            APP_DIR="${{ secrets.APP_DIR }}"
 
             echo "🔹 Updating system"
             sudo dnf update -y
@@ -35,26 +38,24 @@ jobs:
             sudo dnf install -y python3 python3-pip git
 
             echo "🔹 Preparing application directory"
-            mkdir -p ${{ secrets.APP_DIR }}
-            cd ${{ secrets.APP_DIR }}
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
 
-            if [ -z "$(ls -A .)" ]; then
-              echo "🔹 Directory empty → cloning repository"
-              git clone https://github.com/${{ github.repository }} .
-            elif [ -d ".git" ]; then
-              echo "🔹 Repository exists → pulling latest changes"
+            if [ -d ".git" ]; then
+              echo "🔹 Git repo exists → pulling latest code"
               git pull origin main
             else
-              echo "❌ Directory not empty and not a git repository"
-              exit 1
+              echo "⚠ Directory not a git repo → cleaning & fresh clone"
+              rm -rf ./*
+              git clone https://github.com/${{ github.repository }} .
             fi
 
-            echo "🔹 Installing Python dependencies"
+            echo "🔹 Installing dependencies"
             pip3 install --user -r requirements.txt
 
-            echo "🔹 Restarting Python application"
+            echo "🔹 Restarting app"
             pkill -f app.py || true
             nohup python3 app.py > app.log 2>&1 &
 
-            echo "✅ Deployment completed successfully"
+            echo "✅ Deployment successful"
           EOF
