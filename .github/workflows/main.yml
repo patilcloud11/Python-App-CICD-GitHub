@@ -1,9 +1,11 @@
 name: Install Python & Deploy App using SSH
 
 on:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
+   # 🔹 Manual trigger
+  workflow_dispatch:
 
 jobs:
   deploy:
